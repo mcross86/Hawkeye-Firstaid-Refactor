@@ -1,0 +1,16 @@
+{
+  "name": "hawkeye-firstaid-refactor",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @hawkeye/api\" \"npm run dev -w @hawkeye/web\"",
+    "start:api": "npm run start -w @hawkeye/api",
+    "build:web": "npm run build -w @hawkeye/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
