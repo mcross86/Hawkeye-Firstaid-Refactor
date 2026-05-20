@@ -724,10 +724,10 @@ function App() {
                                 scheduleError
                                   ? scheduleError
                                   : isLoadingSchedule
-                                    ? "Loading scheduled customers..."
+                                    ? "Loading customers..."
                                     : scheduledCustomers.length
                                       ? ""
-                                      : "No customers scheduled."
+                                      : "No customers available for this day."
                               }
                             >
                               {scheduledCustomers.map((customer) => (

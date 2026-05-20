@@ -121,17 +121,18 @@ router.get("/field/scheduled-customers", async (req, res) => {
       `SELECT customer_ids_json FROM driver_customer_schedule WHERE driver_id = ? AND service_date = ?`,
       [driverId, serviceDate]
     );
-    const ids = row ? JSON.parse(row.customer_ids_json || "[]") : [];
-    if (!ids.length) {
-      return res.json([]);
-    }
-    const ph = ids.map(() => "?").join(",");
+    const scheduledIds = row ? JSON.parse(row.customer_ids_json || "[]") : [];
+    const scheduledSet = new Set(scheduledIds.map(String));
+
     const customers = await db.all(
-      `SELECT id, name, is_active FROM customers WHERE id IN (${ph}) ORDER BY name ASC`,
-      ids
+      `SELECT id, name, is_active, order_any_time FROM customers WHERE is_active = 1 ORDER BY name ASC`
     );
-    const active = customers.filter((c) => c.is_active === 1);
-    res.json(active.map((c) => ({ id: c.id, name: c.name, isActive: true })));
+
+    const available = customers.filter(
+      (c) => c.order_any_time === 1 || scheduledSet.has(String(c.id))
+    );
+
+    res.json(available.map((c) => ({ id: c.id, name: c.name, isActive: true })));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

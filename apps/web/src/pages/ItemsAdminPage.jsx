@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -66,6 +66,7 @@ function ItemsAdminPage({ onCatalogChanged }) {
   const [dialog, setDialog] = useState({ open: false, form: emptyForm() });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [feedback, setFeedback] = useState({ type: "", message: "" });
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const [list, cats] = await Promise.all([listItemsForAdmin(), getItemCategories()]);
@@ -77,6 +78,28 @@ function ItemsAdminPage({ onCatalogChanged }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const visibleItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      const blob = [
+        item.sku,
+        item.name,
+        item.notes,
+        item.uom,
+        item.categoryId,
+        categoryNameById[item.categoryId],
+        item.listPriceUsd != null && Number.isFinite(Number(item.listPriceUsd))
+          ? String(item.listPriceUsd)
+          : ""
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [items, categoryNameById, search]);
 
   const notifyCatalogChanged = () => {
     onCatalogChanged?.();
@@ -243,6 +266,19 @@ function ItemsAdminPage({ onCatalogChanged }) {
             <Alert severity={feedback.type === "error" ? "error" : "success"}>{feedback.message}</Alert>
           )}
 
+          <TextField
+            size="small"
+            fullWidth
+            label="Search"
+            placeholder="SKU, description, category, UOM, notes, price"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <Typography variant="caption" color="text.secondary">
+            {visibleItems.length} of {items.length} item{items.length === 1 ? "" : "s"}.
+          </Typography>
+
           <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
             <Table size="small" stickyHeader>
               <TableHead>
@@ -258,7 +294,16 @@ function ItemsAdminPage({ onCatalogChanged }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {items.map((item) => (
+                {visibleItems.length === 0 && items.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8}>
+                      <Typography variant="body2" color="text.secondary">
+                        No items match your search.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {visibleItems.map((item) => (
                   <TableRow key={item.id} hover>
                     <TableCell>{item.sku}</TableCell>
                     <TableCell>{item.name}</TableCell>

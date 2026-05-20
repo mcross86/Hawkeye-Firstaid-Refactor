@@ -51,7 +51,7 @@ import {
   updateSiteLocation
 } from "../features/site/services/siteDirectoryService";
 
-const emptyCustomerForm = () => ({ id: "", name: "", isActive: true });
+const emptyCustomerForm = () => ({ id: "", name: "", isActive: true, orderAnyTime: true });
 
 const emptySiteForm = () => ({
   id: "",
@@ -549,23 +549,28 @@ function CustomersAdminPage() {
   const openEditCustomer = (customer) => {
     setCustomerDialog({
       open: true,
-      form: { id: customer.id, name: customer.name, isActive: customer.isActive }
+      form: {
+        id: customer.id,
+        name: customer.name,
+        isActive: customer.isActive,
+        orderAnyTime: customer.orderAnyTime !== false
+      }
     });
     setFeedback({ type: "", message: "" });
   };
 
   const saveCustomer = async () => {
-    const { id, name, isActive } = customerDialog.form;
+    const { id, name, isActive, orderAnyTime } = customerDialog.form;
     if (!name.trim()) {
       setFeedback({ type: "error", message: "Customer name is required." });
       return;
     }
     try {
       if (id) {
-        await updateCustomer({ id, name, isActive });
+        await updateCustomer({ id, name, isActive, orderAnyTime });
         setFeedback({ type: "success", message: "Customer updated." });
       } else {
-        await createCustomer({ name, isActive });
+        await createCustomer({ name, isActive, orderAnyTime });
         setFeedback({ type: "success", message: "Customer created." });
       }
       setCustomerDialog({ open: false, form: emptyCustomerForm() });
@@ -822,6 +827,15 @@ function CustomersAdminPage() {
                       {!customer.isActive && (
                         <Chip component="span" size="small" label="Inactive" sx={{ ml: 1 }} />
                       )}
+                      {customer.orderAnyTime === false && (
+                        <Chip
+                          component="span"
+                          size="small"
+                          label="Schedule required"
+                          variant="outlined"
+                          sx={{ ml: 1 }}
+                        />
+                      )}
                     </Box>
                     <IconButton
                       size="small"
@@ -1009,6 +1023,27 @@ function CustomersAdminPage() {
             >
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Order Any Time"
+              fullWidth
+              value={customerDialog.form.orderAnyTime ? "yes" : "no"}
+              onChange={(e) =>
+                setCustomerDialog((prev) => ({
+                  ...prev,
+                  form: { ...prev.form, orderAnyTime: e.target.value === "yes" }
+                }))
+              }
+              helperText={
+                customerDialog.form.orderAnyTime
+                  ? "Drivers can select this customer on any service date."
+                  : "Drivers only see this customer when it is on their route schedule for that day."
+              }
+            >
+              <MenuItem value="yes">Yes</MenuItem>
+              <MenuItem value="no">No</MenuItem>
             </TextField>
           </Stack>
         </DialogContent>

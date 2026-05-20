@@ -3,9 +3,9 @@
  */
 
 const seedCustomers = [
-  { id: "cust-001", name: "Acme Manufacturing", is_active: 1 },
-  { id: "cust-002", name: "Beacon Distribution", is_active: 1 },
-  { id: "cust-003", name: "Cedar Medical", is_active: 1 }
+  { id: "cust-001", name: "Acme Manufacturing", is_active: 1, order_any_time: 1 },
+  { id: "cust-002", name: "Beacon Distribution", is_active: 1, order_any_time: 1 },
+  { id: "cust-003", name: "Cedar Medical", is_active: 1, order_any_time: 1 }
 ];
 
 const seedSites = [
@@ -362,10 +362,11 @@ async function seedIfEmpty(db) {
   }
 
   for (const c of seedCustomers) {
-    await db.run(`INSERT INTO customers (id, name, is_active) VALUES (?, ?, ?)`, [
+    await db.run(`INSERT INTO customers (id, name, is_active, order_any_time) VALUES (?, ?, ?, ?)`, [
       c.id,
       c.name,
-      c.is_active
+      c.is_active,
+      c.order_any_time ?? 1
     ]);
   }
 

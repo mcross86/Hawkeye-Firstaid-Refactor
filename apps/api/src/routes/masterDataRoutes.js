@@ -23,7 +23,8 @@ function mapCustomer(row) {
   return {
     id: row.id,
     name: row.name,
-    isActive: row.is_active === 1
+    isActive: row.is_active === 1,
+    orderAnyTime: row.order_any_time == null || row.order_any_time === 1
   };
 }
 
@@ -127,7 +128,9 @@ async function fetchHistoriesForSites(db, siteIds) {
 router.get("/master/customers", async (req, res) => {
   try {
     const db = getDb();
-    const rows = await db.all(`SELECT id, name, is_active FROM customers ORDER BY name ASC`);
+    const rows = await db.all(
+      `SELECT id, name, is_active, order_any_time FROM customers ORDER BY name ASC`
+    );
     res.json(rows.map(mapCustomer));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -141,14 +144,19 @@ router.post("/master/customers", async (req, res) => {
       return res.status(400).json({ error: "name is required" });
     }
     const isActive = req.body.isActive !== false;
+    const orderAnyTime = req.body.orderAnyTime !== false;
     const id = nextCustomerId();
     const db = getDb();
-    await db.run(`INSERT INTO customers (id, name, is_active) VALUES (?, ?, ?)`, [
+    await db.run(`INSERT INTO customers (id, name, is_active, order_any_time) VALUES (?, ?, ?, ?)`, [
       id,
       name,
-      isActive ? 1 : 0
+      isActive ? 1 : 0,
+      orderAnyTime ? 1 : 0
     ]);
-    const row = await db.get(`SELECT id, name, is_active FROM customers WHERE id = ?`, [id]);
+    const row = await db.get(
+      `SELECT id, name, is_active, order_any_time FROM customers WHERE id = ?`,
+      [id]
+    );
     res.status(201).json(mapCustomer(row));
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -166,12 +174,20 @@ router.patch("/master/customers/:id", async (req, res) => {
     const name = req.body.name != null ? String(req.body.name).trim() : prev.name;
     const isActive =
       req.body.isActive !== undefined ? Boolean(req.body.isActive) : prev.is_active === 1;
-    await db.run(`UPDATE customers SET name = ?, is_active = ? WHERE id = ?`, [
+    const orderAnyTime =
+      req.body.orderAnyTime !== undefined
+        ? Boolean(req.body.orderAnyTime)
+        : prev.order_any_time == null || prev.order_any_time === 1;
+    await db.run(`UPDATE customers SET name = ?, is_active = ?, order_any_time = ? WHERE id = ?`, [
       name,
       isActive ? 1 : 0,
+      orderAnyTime ? 1 : 0,
       id
     ]);
-    const row = await db.get(`SELECT id, name, is_active FROM customers WHERE id = ?`, [id]);
+    const row = await db.get(
+      `SELECT id, name, is_active, order_any_time FROM customers WHERE id = ?`,
+      [id]
+    );
     res.json(mapCustomer(row));
   } catch (e) {
     res.status(500).json({ error: e.message });

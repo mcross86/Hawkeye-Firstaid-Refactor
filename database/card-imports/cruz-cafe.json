@@ -1,0 +1,35 @@
+{
+  "customer": {
+    "id": "cust-cruz-cafe",
+    "name": "Cruz Cafe",
+    "isActive": true
+  },
+  "site": {
+    "id": "site-cruz-main",
+    "name": "Main Street",
+    "address": "100 Main St",
+    "city": "",
+    "state": "",
+    "zip": "",
+    "pocName": "",
+    "pocTitle": "",
+    "pocPhone": "",
+    "entryNotes": "",
+    "hoursOfOperation": "",
+    "preferredServiceTimeOfDay": "",
+    "serviceFrequency": "",
+    "isActive": true
+  },
+  "scheduledServices": [],
+  "locations": [
+    {
+      "id": "sloc-cruz-1",
+      "name": "Counter",
+      "isActive": true,
+      "kitTypeId": null
+    }
+  ],
+  "serviceHistory": [
+    { "date": "2026-01-15", "summary": "Example manual visit from card import template." }
+  ]
+}
