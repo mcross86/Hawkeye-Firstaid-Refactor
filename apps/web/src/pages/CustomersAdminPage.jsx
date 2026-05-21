@@ -1001,10 +1001,6 @@ function CustomersAdminPage() {
                                 openEditSiteLocation={openEditSiteLocation}
                                 setDeleteSiteLocationTarget={setDeleteSiteLocationTarget}
                               />
-                              <Divider sx={{ my: 2 }} />
-                              <Button size="small" variant="contained" onClick={() => openEditSite(site, detailTab)}>
-                                Edit site
-                              </Button>
                             </AccordionDetails>
                           </Accordion>
                         );

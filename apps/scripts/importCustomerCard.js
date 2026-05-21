@@ -20,6 +20,7 @@ const fs = require("fs");
 const path = require("path");
 
 const apiRoot = path.join(__dirname, "..", "api");
+const repoRoot = path.join(__dirname, "..", "..");
 process.chdir(apiRoot);
 
 const { initDb, getDb } = require(path.join(apiRoot, "src", "db"));
@@ -27,9 +28,9 @@ const { initDb, getDb } = require(path.join(apiRoot, "src", "db"));
 function resolveJsonPath() {
   const arg = process.argv[2];
   if (arg) {
-    return path.isAbsolute(arg) ? arg : path.resolve(process.cwd(), arg);
+    return path.isAbsolute(arg) ? arg : path.resolve(repoRoot, arg);
   }
-  return path.resolve(apiRoot, "..", "..", "database", "card-imports", "cruz-cafe.json");
+  return path.resolve(repoRoot, "database", "card-imports", "cruz-cafe.json");
 }
 
 async function upsertCustomer(db, { id, name, isActive }) {
