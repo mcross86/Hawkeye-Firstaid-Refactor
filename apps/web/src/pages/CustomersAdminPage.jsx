@@ -407,8 +407,14 @@ function SiteDetailTabPanels({
       </TabPanel>
 
       <TabPanel value={detailTab} index={4}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="body2" color="text.secondary">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          spacing={1}
+          sx={{ mb: 1, minWidth: 0 }}
+        >
+          <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
             Specific places within this site for driver orders (Customer → Site → Location).
           </Typography>
           <Button
@@ -416,11 +422,12 @@ function SiteDetailTabPanels({
             variant="outlined"
             startIcon={<AddCircleOutlineIcon fontSize="small" />}
             onClick={() => openCreateSiteLocation(site, customerId)}
+            sx={{ flexShrink: 0, alignSelf: { xs: "flex-start", sm: "center" } }}
           >
             Add location
           </Button>
         </Stack>
-        <TableContainer>
+        <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -483,8 +490,8 @@ function CustomersAdminPage() {
   const [feedback, setFeedback] = useState({ type: "", message: "" });
   const [search, setSearch] = useState("");
   const [expandedCustomerId, setExpandedCustomerId] = useState(null);
-  /** Nested site accordions: expanded details with tabs */
-  const [expandedSites, setExpandedSites] = useState({});
+  /** At most one site accordion open (site ids are unique across customers). */
+  const [expandedSiteId, setExpandedSiteId] = useState(null);
   const [siteDetailTabById, setSiteDetailTabById] = useState({});
 
   const loadCustomers = useCallback(async () => {
@@ -818,19 +825,13 @@ function CustomersAdminPage() {
                 onChange={(_, expanded) => {
                   if (expanded) {
                     setExpandedCustomerId(customer.id);
-                    const siteIds = (sitesByCustomer[customer.id] || []).map((s) => s.id);
-                    setExpandedSites((prev) => {
-                      const next = {};
-                      for (const id of siteIds) {
-                        if (prev[id]) {
-                          next[id] = true;
-                        }
-                      }
-                      return next;
+                    setExpandedSiteId((prev) => {
+                      const sites = sitesByCustomer[customer.id] || [];
+                      return sites.some((s) => s.id === prev) ? prev : null;
                     });
                   } else if (expandedCustomerId === customer.id) {
                     setExpandedCustomerId(null);
-                    setExpandedSites({});
+                    setExpandedSiteId(null);
                   }
                 }}
                 sx={{ border: 1, borderColor: "divider" }}
@@ -908,10 +909,8 @@ function CustomersAdminPage() {
                         return (
                           <Accordion
                             key={site.id}
-                            expanded={Boolean(expandedSites[site.id])}
-                            onChange={(_, expanded) =>
-                              setExpandedSites((prev) => ({ ...prev, [site.id]: expanded }))
-                            }
+                            expanded={expandedSiteId === site.id}
+                            onChange={(_, expanded) => setExpandedSiteId(expanded ? site.id : null)}
                             disableGutters
                             elevation={0}
                             sx={{

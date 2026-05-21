@@ -672,7 +672,7 @@ function App() {
           <Box
             component="img"
             src={hawkeyeLogo}
-            alt="Hawkeye Fire & Safety logo"
+            alt="Hawkeye Firstaid and Safety logo"
             sx={{ height: 30, width: "auto", ml: 2 }}
           />
         </Toolbar>

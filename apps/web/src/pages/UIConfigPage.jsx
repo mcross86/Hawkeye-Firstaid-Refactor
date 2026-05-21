@@ -201,7 +201,8 @@ function UIConfigPage({ activeDrivers, onConfigurationSaved }) {
                 onDrop={() => handleDrop(row.categoryId)}
                 sx={{
                   borderRadius: 1,
-                  border: draggedCategoryId === row.categoryId ? "1px dashed #1976d2" : "none",
+                  border: draggedCategoryId === row.categoryId ? "1px dashed" : "none",
+                  borderColor: draggedCategoryId === row.categoryId ? "primary.main" : undefined,
                   p: 0.5
                 }}
               >
