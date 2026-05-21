@@ -85,10 +85,20 @@ const emptySiteLocationForm = () => ({
   isActive: true
 });
 
+const LONG_TEXT_WRAP_SX = {
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+  maxWidth: "100%"
+};
+
 function TabPanel({ children, value, index }) {
   return (
     <div role="tabpanel" hidden={value !== index}>
-      {value === index ? <Box sx={{ pt: 2 }}>{children}</Box> : null}
+      {value === index ? (
+        <Box sx={{ pt: 2, minWidth: 0, width: "100%", overflow: "hidden" }}>
+          {children}
+        </Box>
+      ) : null}
     </div>
   );
 }
@@ -96,11 +106,18 @@ function TabPanel({ children, value, index }) {
 function PropRow({ label, value, multiline = false }) {
   const display = value != null && String(value).trim() !== "";
   return (
-    <Box sx={{ py: 0.75 }}>
+    <Box sx={{ py: 0.75, minWidth: 0, maxWidth: "100%" }}>
       <Typography variant="caption" color="text.secondary" display="block">
         {label}
       </Typography>
-      <Typography variant="body2" sx={{ whiteSpace: multiline ? "pre-wrap" : "normal", mt: 0.25 }}>
+      <Typography
+        variant="body2"
+        sx={{
+          whiteSpace: multiline ? "pre-wrap" : "normal",
+          mt: 0.25,
+          ...LONG_TEXT_WRAP_SX
+        }}
+      >
         {display ? String(value) : "—"}
       </Typography>
     </Box>
@@ -255,23 +272,23 @@ function SiteDetailTabPanels({
   return (
     <>
       <TabPanel value={detailTab} index={0}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
-          <Box sx={{ flex: 1 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={3} sx={{ minWidth: 0, width: "100%" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <PropRow label="Site name" value={site.name} />
             <PropRow label="Street address" value={site.address} />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
                 <PropRow label="City" value={site.city} />
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
                 <PropRow label="State" value={site.state} />
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
                 <PropRow label="ZIP" value={site.zip} />
               </Box>
             </Stack>
           </Box>
-          <Box sx={{ flex: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Divider sx={{ display: { xs: "block", md: "none" }, my: 1 }} />
             <PropRow label="Hours of operation" value={site.hoursOfOperation} />
             <PropRow label="Preferred service time of day" value={site.preferredServiceTimeOfDay} />
@@ -907,14 +924,24 @@ function CustomersAdminPage() {
                           >
                             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                               <Stack direction="row" alignItems="center" spacing={1} sx={{ width: "100%", pr: 1 }}>
-                                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                                  <Typography component="span" variant="subtitle2" fontWeight={700}>
+                                <Box sx={{ flexGrow: 1, minWidth: 0, overflow: "hidden" }}>
+                                  <Typography
+                                    component="span"
+                                    variant="subtitle2"
+                                    fontWeight={700}
+                                    sx={{ ...LONG_TEXT_WRAP_SX, display: "block" }}
+                                  >
                                     {site.name}
                                   </Typography>
                                   {!site.isActive && (
                                     <Chip component="span" size="small" label="Inactive" sx={{ ml: 1 }} />
                                   )}
-                                  <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    display="block"
+                                    sx={LONG_TEXT_WRAP_SX}
+                                  >
                                     {formatAddressLine(site)}
                                   </Typography>
                                   {(site.pocName || "").trim() ? (
@@ -945,7 +972,9 @@ function CustomersAdminPage() {
                                 </IconButton>
                               </Stack>
                             </AccordionSummary>
-                            <AccordionDetails sx={{ pt: 0, px: 1.5, pb: 2, bgcolor: "action.hover" }}>
+                            <AccordionDetails
+                              sx={{ pt: 0, px: 1.5, pb: 2, bgcolor: "action.hover", overflow: "hidden" }}
+                            >
                               <Tabs
                                 value={detailTab}
                                 onChange={(_, v) =>
@@ -1070,8 +1099,8 @@ function CustomersAdminPage() {
               ? "Edit site"
               : "Add site"}
         </DialogTitle>
-        <DialogContent>
-          <Stack spacing={0}>
+        <DialogContent sx={{ overflow: "hidden" }}>
+          <Stack spacing={0} sx={{ minWidth: 0, width: "100%" }}>
             {feedback.message && siteDialog.open && (
               <Alert severity={feedback.type === "error" ? "error" : "success"} sx={{ mb: 1 }}>
                 {feedback.message}
@@ -1094,7 +1123,7 @@ function CustomersAdminPage() {
 
             {siteDialog.mode !== "schedule" ? (
               <TabPanel value={siteTab} index={0}>
-              <Stack spacing={2}>
+              <Stack spacing={2} sx={{ minWidth: 0, width: "100%" }}>
                 <TextField
                   size="small"
                   label="Site name"
@@ -1104,15 +1133,24 @@ function CustomersAdminPage() {
                   onChange={(e) =>
                     setSiteDialog((prev) => ({ ...prev, form: { ...prev.form, name: e.target.value } }))
                   }
+                  slotProps={{
+                    htmlInput: { sx: LONG_TEXT_WRAP_SX }
+                  }}
                 />
                 <TextField
                   size="small"
                   label="Street address"
                   fullWidth
+                  multiline
+                  minRows={2}
+                  maxRows={6}
                   value={siteDialog.form.address}
                   onChange={(e) =>
                     setSiteDialog((prev) => ({ ...prev, form: { ...prev.form, address: e.target.value } }))
                   }
+                  slotProps={{
+                    htmlInput: { sx: LONG_TEXT_WRAP_SX }
+                  }}
                 />
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField

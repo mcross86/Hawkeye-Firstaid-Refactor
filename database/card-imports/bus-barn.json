@@ -1,0 +1,64 @@
+{
+  "customer": {
+    "id": "cust-bus-barn",
+    "name": "Bus Barn",
+    "isActive": true
+  },
+  "site": {
+    "id": "site-bus-barn-edgewood",
+    "name": "Edgewood Rd",
+    "address": "2500 Edgewood Rd. NW",
+    "city": "Cedar Rapids",
+    "state": "IA",
+    "zip": "",
+    "pocName": "Erica Shelangoski",
+    "pocTitle": "",
+    "pocPhone": "(319) 558-3661",
+    "entryNotes": "Site phone (319) 558-2433. Two kits on site; new kit upstairs breakroom. Purchase limit noted on card: 4 @ 1 month.",
+    "hoursOfOperation": "",
+    "preferredServiceTimeOfDay": "",
+    "serviceFrequency": "Every 1 month",
+    "isActive": true
+  },
+  "scheduledServices": [],
+  "locations": [
+    {
+      "id": "sloc-bus-maint",
+      "name": "Maintenance Shop (Kit 4)",
+      "isActive": true,
+      "kitTypeId": null
+    },
+    {
+      "id": "sloc-bus-break",
+      "name": "Breakroom (Kit 3)",
+      "isActive": true,
+      "kitTypeId": null
+    },
+    {
+      "id": "sloc-bus-break-upstairs",
+      "name": "Upstairs Breakroom (new kit)",
+      "isActive": true,
+      "kitTypeId": null
+    }
+  ],
+  "serviceHistory": [
+    { "date": "2017-08-24", "summary": "Next: SEPT" },
+    { "date": "2017-10-17", "summary": "Next: NOV DEC" },
+    { "date": "2018-03-05", "summary": "Next: JULY" },
+    { "date": "2018-07-18", "summary": "Next: 11/18/18" },
+    { "date": "2018-11-26", "summary": "Next: MARCH" },
+    { "date": "2019-03-06", "summary": "Next: 7/6/19" },
+    { "date": "2019-07-22", "summary": "Next: 11/22/19" },
+    { "date": "2019-12-03", "summary": "Next: 4/3/20" },
+    { "date": "2020-08-05", "summary": "Next: 12/5/20" },
+    { "date": "2021-04-01", "summary": "Next: 4/1/21 (date column blank on card)" },
+    { "date": "2021-04-20", "summary": "Next: 8/20/21" },
+    { "date": "2021-09-16", "summary": "Next: 1/16/21 (as written on card)" },
+    { "date": "2022-02-15", "summary": "Next: 10/15/22" },
+    { "date": "2022-02-14", "summary": "Next: 10/14/22" },
+    { "date": "2022-10-28", "summary": "Next: APR." },
+    { "date": "2023-07-25", "summary": "Next: FEB." },
+    { "date": "2024-06-17", "summary": "Next: MAR. 25" },
+    { "date": "2025-10-21", "summary": "Latest visit on card" }
+  ]
+}
