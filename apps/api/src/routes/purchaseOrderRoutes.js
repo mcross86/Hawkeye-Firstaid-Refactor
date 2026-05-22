@@ -3,6 +3,22 @@ const { getDb } = require("../db");
 
 const router = express.Router();
 
+const CANCEL_REASON_CODES = {
+  wrong_customer: "Wrong Customer",
+  created_in_error: "Created in Error",
+  customer_cancelled: "Customer Cancelled",
+  other: "Other"
+};
+
+function normalizeCancelReasonCode(value) {
+  const raw = String(value || "").trim();
+  if (CANCEL_REASON_CODES[raw]) {
+    return raw;
+  }
+  const byLabel = Object.entries(CANCEL_REASON_CODES).find(([, label]) => label === raw);
+  return byLabel ? byLabel[0] : null;
+}
+
 async function getLocationName(db, locationId) {
   if (!locationId) {
     return null;
@@ -279,6 +295,73 @@ router.patch("/clerk/purchase-orders/:id", async (req, res) => {
       [id]
     );
     res.json(mapPurchaseOrderWithItems(updated, items));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete("/clerk/purchase-orders/:id", async (req, res) => {
+  const db = getDb();
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: "Invalid purchase order id" });
+  }
+
+  const cancelReasonCode = normalizeCancelReasonCode(req.body?.cancelReasonCode);
+  if (!cancelReasonCode) {
+    return res.status(400).json({
+      error: `cancelReasonCode is required (${Object.values(CANCEL_REASON_CODES).join(", ")})`
+    });
+  }
+
+  const cancelReasonDetail =
+    req.body?.cancelReasonDetail != null ? String(req.body.cancelReasonDetail).trim() : "";
+  if (cancelReasonCode === "other" && !cancelReasonDetail) {
+    return res.status(400).json({ error: "cancelReasonDetail is required when reason is Other" });
+  }
+
+  try {
+    const prev = await db.get(`SELECT * FROM purchase_orders WHERE id = ?`, [id]);
+    if (!prev) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+    if (String(prev.status || "").toLowerCase() === "invoiced") {
+      return res.status(409).json({ error: "Invoiced purchase orders cannot be cancelled." });
+    }
+
+    const poNumber = `PO-${id}`;
+
+    await db.exec("BEGIN TRANSACTION");
+    try {
+      await db.run(
+        `INSERT INTO purchase_order_cancellations (
+          purchase_order_id, po_number, customer_name, cancel_reason_code, cancel_reason_detail
+        ) VALUES (?, ?, ?, ?, ?)`,
+        [
+          id,
+          poNumber,
+          prev.customer_name || null,
+          cancelReasonCode,
+          cancelReasonDetail || null
+        ]
+      );
+
+      await db.run(`DELETE FROM site_service_history WHERE purchase_order_id = ?`, [id]);
+      await db.run(`DELETE FROM purchase_orders WHERE id = ?`, [id]);
+
+      await db.exec("COMMIT");
+    } catch (e) {
+      await db.exec("ROLLBACK");
+      throw e;
+    }
+
+    res.json({
+      ok: true,
+      id,
+      poNumber,
+      cancelReasonCode,
+      cancelReasonLabel: CANCEL_REASON_CODES[cancelReasonCode]
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

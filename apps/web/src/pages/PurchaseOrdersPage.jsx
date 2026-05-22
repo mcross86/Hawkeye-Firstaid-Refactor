@@ -23,7 +23,19 @@ import {
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
-import { listPurchaseOrders, updatePurchaseOrder } from "../services/api/purchaseOrderApi";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import {
+  cancelPurchaseOrder,
+  listPurchaseOrders,
+  updatePurchaseOrder
+} from "../services/api/purchaseOrderApi";
+
+const CANCEL_REASON_OPTIONS = [
+  { code: "wrong_customer", label: "Wrong Customer" },
+  { code: "created_in_error", label: "Created in Error" },
+  { code: "customer_cancelled", label: "Customer Cancelled" },
+  { code: "other", label: "Other" }
+];
 import { listItemsForAdmin } from "../features/item/services/itemDirectoryService";
 
 const SORTABLE_COLUMNS = [
@@ -124,6 +136,11 @@ function PurchaseOrdersPage() {
   const [editForm, setEditForm] = useState({ status: "submitted", notes: "", items: [] });
   const [editFeedback, setEditFeedback] = useState({ type: "", message: "" });
   const [saving, setSaving] = useState(false);
+  const [cancelDialog, setCancelDialog] = useState({ open: false, orderId: null });
+  const [cancelReasonCode, setCancelReasonCode] = useState("");
+  const [cancelReasonDetail, setCancelReasonDetail] = useState("");
+  const [cancelFeedback, setCancelFeedback] = useState({ type: "", message: "" });
+  const [cancelling, setCancelling] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -345,6 +362,60 @@ function PurchaseOrdersPage() {
     setEditDialog({ open: false, orderId: null });
     setEditFeedback({ type: "", message: "" });
     setSaving(false);
+  };
+
+  const openCancelFromEdit = () => {
+    if (!editDialog.orderId) return;
+    const order = orders.find((o) => o.id === editDialog.orderId);
+    if (!order) return;
+    if (String(order.status || "").toLowerCase() === "invoiced") {
+      setEditFeedback({ type: "error", message: "Invoiced purchase orders cannot be cancelled." });
+      return;
+    }
+    setCancelFeedback({ type: "", message: "" });
+    setCancelReasonCode("");
+    setCancelReasonDetail("");
+    setCancelDialog({ open: true, orderId: editDialog.orderId });
+  };
+
+  const closeCancelDialog = () => {
+    setCancelDialog({ open: false, orderId: null });
+    setCancelReasonCode("");
+    setCancelReasonDetail("");
+    setCancelFeedback({ type: "", message: "" });
+    setCancelling(false);
+  };
+
+  const confirmCancelPo = async () => {
+    if (!cancelDialog.orderId) return;
+    if (!cancelReasonCode) {
+      setCancelFeedback({ type: "error", message: "Select a cancel reason." });
+      return;
+    }
+    if (cancelReasonCode === "other" && !cancelReasonDetail.trim()) {
+      setCancelFeedback({ type: "error", message: "Enter details when reason is Other." });
+      return;
+    }
+
+    setCancelling(true);
+    setCancelFeedback({ type: "", message: "" });
+    try {
+      const result = await cancelPurchaseOrder(cancelDialog.orderId, {
+        cancelReasonCode,
+        cancelReasonDetail: cancelReasonDetail.trim()
+      });
+      setOrders((prev) => prev.filter((o) => o.id !== cancelDialog.orderId));
+      closeCancelDialog();
+      closeEdit();
+      setPageFeedback({
+        type: "success",
+        message: `${result.poNumber || `PO-${cancelDialog.orderId}`} cancelled and removed.`
+      });
+    } catch (e) {
+      setCancelFeedback({ type: "error", message: e.message || "Cancel failed." });
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const updateLine = (index, field, value) => {
@@ -695,14 +766,105 @@ function PurchaseOrdersPage() {
             >
               Add line
             </Button>
+
+            <Stack
+              spacing={1}
+              sx={{
+                pt: 1,
+                borderTop: 1,
+                borderColor: "divider"
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={700}>
+                PO Actions
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<CancelOutlinedIcon fontSize="small" />}
+                onClick={openCancelFromEdit}
+                disabled={saving || String(editForm.status || "").toLowerCase() === "invoiced"}
+                sx={{ alignSelf: "flex-start" }}
+              >
+                Cancel PO
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Permanently removes this purchase order and all line items from the system.
+              </Typography>
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button size="small" onClick={closeEdit} disabled={saving}>
-            Cancel
+            Close
           </Button>
           <Button size="small" variant="contained" onClick={saveEdit} disabled={saving}>
             {saving ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={cancelDialog.open} onClose={closeCancelDialog} fullWidth maxWidth="sm">
+        <DialogTitle>
+          Cancel purchase order {cancelDialog.orderId ? `PO-${cancelDialog.orderId}` : ""}?
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Alert severity="warning">
+              Cancelling this PO permanently deletes the purchase order and all of its line items from the
+              database. This cannot be undone.
+            </Alert>
+
+            {cancelFeedback.message ? (
+              <Alert severity={cancelFeedback.type === "error" ? "error" : "success"}>
+                {cancelFeedback.message}
+              </Alert>
+            ) : null}
+
+            <TextField
+              select
+              required
+              size="small"
+              label="Cancel reason"
+              value={cancelReasonCode}
+              onChange={(e) => setCancelReasonCode(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="">Select a reason</MenuItem>
+              {CANCEL_REASON_OPTIONS.map((opt) => (
+                <MenuItem key={opt.code} value={opt.code}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {cancelReasonCode === "other" ? (
+              <TextField
+                required
+                size="small"
+                label="Other — please describe"
+                value={cancelReasonDetail}
+                onChange={(e) => setCancelReasonDetail(e.target.value)}
+                fullWidth
+                multiline
+                minRows={2}
+              />
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button size="small" onClick={closeCancelDialog} disabled={cancelling}>
+            Keep PO
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            onClick={confirmCancelPo}
+            disabled={cancelling}
+          >
+            {cancelling ? "Cancelling..." : "Confirm cancel"}
           </Button>
         </DialogActions>
       </Dialog>

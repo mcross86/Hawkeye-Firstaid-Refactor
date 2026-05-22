@@ -27,3 +27,10 @@ export async function updatePurchaseOrder(id, payload) {
     body: JSON.stringify(payload)
   });
 }
+
+export async function cancelPurchaseOrder(id, { cancelReasonCode, cancelReasonDetail }) {
+  return apiFetch(`/api/clerk/purchase-orders/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ cancelReasonCode, cancelReasonDetail })
+  });
+}
