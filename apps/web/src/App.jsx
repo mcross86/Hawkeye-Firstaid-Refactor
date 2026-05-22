@@ -24,6 +24,8 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Typography
 } from "@mui/material";
@@ -53,6 +55,7 @@ import DriverPerformancePage from "./pages/DriverPerformancePage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import ScheduleAdminPage from "./pages/ScheduleAdminPage";
 import HomePage from "./pages/HomePage";
+import SkuPickerField from "./components/SkuPickerField";
 
 const PAGE_HASH = {
   home: "/",
@@ -81,7 +84,10 @@ const getPageFromHash = () => {
   return "home";
 };
 
-const emptyCategoryLine = () => ({
+const LINE_LAYOUT_LIST = "list";
+const LINE_LAYOUT_CATEGORY = "category";
+
+const emptyOrderLine = () => ({
   sku: "",
   itemDescription: "",
   quantity: ""
@@ -89,15 +95,71 @@ const emptyCategoryLine = () => ({
 
 const buildInitialCategoryOrders = (categories) =>
   categories.reduce((acc, category) => {
-    acc[category.id] = [emptyCategoryLine()];
+    acc[category.id] = [emptyOrderLine()];
     return acc;
   }, {});
 
 const reconcileCategoryOrders = (previousOrders, categories) =>
   categories.reduce((acc, category) => {
-    acc[category.id] = previousOrders[category.id] || [emptyCategoryLine()];
+    acc[category.id] = previousOrders[category.id] || [emptyOrderLine()];
     return acc;
   }, {});
+
+function isMeaningfulOrderLine(line) {
+  const sku = String(line?.sku || "").trim();
+  const qty = String(line?.quantity ?? "").trim();
+  return Boolean(sku || qty);
+}
+
+function flattenCategoryOrders(categoryOrders) {
+  const lines = Object.values(categoryOrders || {})
+    .flatMap((rows) => rows || [])
+    .filter(isMeaningfulOrderLine)
+    .map((line) => ({ ...line }));
+  if (!lines.length) {
+    return [emptyOrderLine()];
+  }
+  return lines;
+}
+
+function distributeListToCategories(listLines, categories, catalogBySku) {
+  const buckets = categories.reduce((acc, category) => {
+    acc[category.id] = [];
+    return acc;
+  }, {});
+
+  for (const line of listLines || []) {
+    if (!isMeaningfulOrderLine(line)) {
+      continue;
+    }
+    const sku = String(line.sku || "").trim();
+    const catalogItem = sku ? catalogBySku.get(sku) : null;
+    const categoryId = catalogItem?.categoryId || categories[0]?.id;
+    if (!categoryId) {
+      continue;
+    }
+    buckets[categoryId].push({
+      sku: line.sku || "",
+      itemDescription: line.itemDescription || catalogItem?.name || "",
+      quantity: line.quantity ?? ""
+    });
+  }
+
+  return categories.reduce((acc, category) => {
+    acc[category.id] = buckets[category.id].length ? buckets[category.id] : [emptyOrderLine()];
+    return acc;
+  }, {});
+}
+
+function findCatalogItemBySku(itemsByCategory, sku) {
+  for (const items of Object.values(itemsByCategory)) {
+    const found = (items || []).find((item) => item.sku === sku);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
 
 function App() {
   const [currentPage, setCurrentPage] = useState(getPageFromHash);
@@ -129,24 +191,35 @@ function App() {
   const [itemCategories, setItemCategories] = useState([]);
   const [itemsByCategory, setItemsByCategory] = useState({});
   const [categoryOrders, setCategoryOrders] = useState({});
+  const [lineLayout, setLineLayout] = useState(LINE_LAYOUT_LIST);
+  const [listOrderLines, setListOrderLines] = useState([emptyOrderLine()]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
   const [driverOrderStep, setDriverOrderStep] = useState("edit");
 
-  const orderedItems = useMemo(
-    () =>
-      Object.entries(categoryOrders).flatMap(([categoryId, lines]) =>
-        (lines || [])
-          .filter((line) => line.sku && Number(line.quantity) > 0)
-          .map((line) => ({
-            categoryId,
-            sku: line.sku,
-            itemDescription: line.itemDescription,
-            quantity: Number(line.quantity)
-          }))
-      ),
-    [categoryOrders]
-  );
+  const orderedItems = useMemo(() => {
+    const toSubmitLine = (line, categoryId = "") => {
+      const catalogItem = findCatalogItemBySku(itemsByCategory, line.sku);
+      return {
+        categoryId: categoryId || catalogItem?.categoryId || "",
+        sku: line.sku,
+        itemDescription: line.itemDescription || catalogItem?.name || "",
+        quantity: Number(line.quantity)
+      };
+    };
+
+    if (lineLayout === LINE_LAYOUT_LIST) {
+      return (listOrderLines || [])
+        .filter((line) => line.sku && Number(line.quantity) > 0)
+        .map((line) => toSubmitLine(line));
+    }
+
+    return Object.entries(categoryOrders).flatMap(([categoryId, lines]) =>
+      (lines || [])
+        .filter((line) => line.sku && Number(line.quantity) > 0)
+        .map((line) => toSubmitLine(line, categoryId))
+    );
+  }, [lineLayout, listOrderLines, categoryOrders, itemsByCategory]);
 
   const canSubmit = useMemo(
     () =>
@@ -174,6 +247,19 @@ function App() {
       }, {}),
     [itemCategories]
   );
+
+  const fullCatalogItems = useMemo(() => {
+    const bySku = new Map();
+    for (const items of Object.values(itemsByCategory)) {
+      for (const item of items || []) {
+        if (!item?.sku || bySku.has(item.sku)) continue;
+        bySku.set(item.sku, item);
+      }
+    }
+    return [...bySku.values()].sort((a, b) =>
+      String(a.sku).localeCompare(String(b.sku), undefined, { numeric: true })
+    );
+  }, [itemsByCategory]);
 
   const updateFormField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -463,13 +549,54 @@ function App() {
     }));
   };
 
+  const applySkuToLine = (line, sku) => {
+    const chosenItem = findCatalogItemBySku(itemsByCategory, sku);
+    return {
+      ...line,
+      sku,
+      itemDescription: chosenItem ? chosenItem.name : ""
+    };
+  };
+
+  const handleLineLayoutChange = (_event, nextLayout) => {
+    if (!nextLayout || nextLayout === lineLayout) {
+      return;
+    }
+    const catalogBySku = new Map(fullCatalogItems.map((item) => [item.sku, item]));
+    if (nextLayout === LINE_LAYOUT_LIST) {
+      setListOrderLines(flattenCategoryOrders(categoryOrders));
+    } else {
+      setCategoryOrders(distributeListToCategories(listOrderLines, itemCategories, catalogBySku));
+    }
+    setLineLayout(nextLayout);
+  };
+
+  const updateListLine = (index, field, value) => {
+    setListOrderLines((prev) => {
+      const updated = [...prev];
+      let current = { ...updated[index], [field]: value };
+      if (field === "sku") {
+        current = applySkuToLine(current, value);
+      }
+      updated[index] = current;
+      return updated;
+    });
+  };
+
+  const addListLine = () => {
+    setListOrderLines((prev) => [...prev, emptyOrderLine()]);
+  };
+
+  const removeListLine = (index) => {
+    setListOrderLines((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
   const updateCategoryLine = (categoryId, index, field, value) => {
     setCategoryOrders((prev) => {
       const updated = [...(prev[categoryId] || [])];
-      const current = { ...updated[index], [field]: value };
+      let current = { ...updated[index], [field]: value };
       if (field === "sku") {
-        const chosenItem = (itemsByCategory[categoryId] || []).find((item) => item.sku === value);
-        current.itemDescription = chosenItem ? chosenItem.name : "";
+        current = applySkuToLine(current, value);
       }
       updated[index] = current;
       return { ...prev, [categoryId]: updated };
@@ -509,6 +636,8 @@ function App() {
       notes: ""
     }));
     setCategoryOrders(buildInitialCategoryOrders(itemCategories));
+    setListOrderLines([emptyOrderLine()]);
+    setLineLayout(LINE_LAYOUT_LIST);
     setDriverOrderStep("edit");
   };
 
@@ -523,6 +652,9 @@ function App() {
     setSiteLocations([]);
     setFeedback({ type: "", message: "" });
     setDriverOrderStep("edit");
+    setLineLayout(LINE_LAYOUT_LIST);
+    setListOrderLines([emptyOrderLine()]);
+    setCategoryOrders({});
     setForm({
       customerId: "",
       customerName: "",
@@ -817,32 +949,39 @@ function App() {
                         ) : null}
 
                         <Stack spacing={1}>
-                          {itemCategories.map((category) => (
-                            <Card key={category.id} variant="outlined">
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1}
+                            alignItems={{ sm: "center" }}
+                            justifyContent="space-between"
+                          >
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              Order lines
+                            </Typography>
+                            <ToggleButtonGroup
+                              size="small"
+                              exclusive
+                              value={lineLayout}
+                              onChange={handleLineLayoutChange}
+                              aria-label="order line layout"
+                            >
+                              <ToggleButton value={LINE_LAYOUT_LIST}>List view</ToggleButton>
+                              <ToggleButton value={LINE_LAYOUT_CATEGORY}>Category view</ToggleButton>
+                            </ToggleButtonGroup>
+                          </Stack>
+
+                          {lineLayout === LINE_LAYOUT_LIST ? (
+                            <Card variant="outlined">
                               <CardContent sx={{ p: 1 }}>
                                 <Stack spacing={1}>
-                                  <Typography variant="subtitle2" fontWeight={700}>
-                                    {category.name}
-                                  </Typography>
-                                  {(categoryOrders[category.id] || []).map((line, index) => (
-                                    <Grid container spacing={1} key={`${category.id}-${index}`}>
+                                  {listOrderLines.map((line, index) => (
+                                    <Grid container spacing={1} key={`list-line-${index}`}>
                                       <Grid size={{ xs: 8, sm: 9 }}>
-                                        <TextField
-                                          select
-                                          size="small"
-                                          fullWidth
-                                          label="SKU"
+                                        <SkuPickerField
+                                          catalogItems={fullCatalogItems}
                                           value={line.sku}
-                                          onChange={(e) =>
-                                            updateCategoryLine(category.id, index, "sku", e.target.value)
-                                          }
-                                        >
-                                          {(itemsByCategory[category.id] || []).map((item) => (
-                                            <MenuItem key={item.id} value={item.sku}>
-                                              {item.sku} - {item.name}
-                                            </MenuItem>
-                                          ))}
-                                        </TextField>
+                                          onChange={(sku) => updateListLine(index, "sku", sku)}
+                                        />
                                       </Grid>
                                       <Grid size={{ xs: 3, sm: 2 }}>
                                         <TextField
@@ -853,7 +992,7 @@ function App() {
                                           inputProps={{ min: 0 }}
                                           value={line.quantity}
                                           onChange={(e) =>
-                                            updateCategoryLine(category.id, index, "quantity", e.target.value)
+                                            updateListLine(index, "quantity", e.target.value)
                                           }
                                         />
                                       </Grid>
@@ -861,8 +1000,8 @@ function App() {
                                         <IconButton
                                           size="small"
                                           aria-label="remove line"
-                                          onClick={() => removeCategoryLine(category.id, index)}
-                                          disabled={(categoryOrders[category.id] || []).length === 1}
+                                          onClick={() => removeListLine(index)}
+                                          disabled={listOrderLines.length <= 1}
                                         >
                                           <DeleteOutlineIcon fontSize="small" />
                                         </IconButton>
@@ -873,14 +1012,76 @@ function App() {
                                     size="small"
                                     variant="text"
                                     startIcon={<AddCircleOutlineIcon fontSize="small" />}
-                                    onClick={() => addCategoryLine(category.id)}
+                                    onClick={addListLine}
+                                    sx={{ alignSelf: "flex-start" }}
                                   >
-                                    Add SKU
+                                    Add line
                                   </Button>
                                 </Stack>
                               </CardContent>
                             </Card>
-                          ))}
+                          ) : (
+                            itemCategories.map((category) => (
+                              <Card key={category.id} variant="outlined">
+                                <CardContent sx={{ p: 1 }}>
+                                  <Stack spacing={1}>
+                                    <Typography variant="subtitle2" fontWeight={700}>
+                                      {category.name}
+                                    </Typography>
+                                    {(categoryOrders[category.id] || []).map((line, index) => (
+                                      <Grid container spacing={1} key={`${category.id}-${index}`}>
+                                        <Grid size={{ xs: 8, sm: 9 }}>
+                                          <SkuPickerField
+                                            catalogItems={fullCatalogItems}
+                                            value={line.sku}
+                                            onChange={(sku) =>
+                                              updateCategoryLine(category.id, index, "sku", sku)
+                                            }
+                                          />
+                                        </Grid>
+                                        <Grid size={{ xs: 3, sm: 2 }}>
+                                          <TextField
+                                            size="small"
+                                            fullWidth
+                                            type="number"
+                                            label="Qty"
+                                            inputProps={{ min: 0 }}
+                                            value={line.quantity}
+                                            onChange={(e) =>
+                                              updateCategoryLine(
+                                                category.id,
+                                                index,
+                                                "quantity",
+                                                e.target.value
+                                              )
+                                            }
+                                          />
+                                        </Grid>
+                                        <Grid size={{ xs: 1, sm: 1 }} display="flex" alignItems="center">
+                                          <IconButton
+                                            size="small"
+                                            aria-label="remove line"
+                                            onClick={() => removeCategoryLine(category.id, index)}
+                                            disabled={(categoryOrders[category.id] || []).length <= 1}
+                                          >
+                                            <DeleteOutlineIcon fontSize="small" />
+                                          </IconButton>
+                                        </Grid>
+                                      </Grid>
+                                    ))}
+                                    <Button
+                                      size="small"
+                                      variant="text"
+                                      startIcon={<AddCircleOutlineIcon fontSize="small" />}
+                                      onClick={() => addCategoryLine(category.id)}
+                                    >
+                                      Add line
+                                    </Button>
+                                  </Stack>
+                                </CardContent>
+                              </Card>
+                            ))
+                          )}
                         </Stack>
 
                         <TextField
@@ -938,7 +1139,9 @@ function App() {
                                 <TableRow>
                                   <TableCell>SKU</TableCell>
                                   <TableCell>Description</TableCell>
-                                  <TableCell>Category</TableCell>
+                                  {lineLayout === LINE_LAYOUT_CATEGORY ? (
+                                    <TableCell>Category</TableCell>
+                                  ) : null}
                                   <TableCell align="right">Qty</TableCell>
                                 </TableRow>
                               </TableHead>
@@ -947,7 +1150,11 @@ function App() {
                                   <TableRow key={`${line.categoryId}-${line.sku}-${index}`}>
                                     <TableCell>{line.sku}</TableCell>
                                     <TableCell>{line.itemDescription || "—"}</TableCell>
-                                    <TableCell>{categoryNameById[line.categoryId] || line.categoryId}</TableCell>
+                                    {lineLayout === LINE_LAYOUT_CATEGORY ? (
+                                      <TableCell>
+                                        {categoryNameById[line.categoryId] || line.categoryId || "—"}
+                                      </TableCell>
+                                    ) : null}
                                     <TableCell align="right">{line.quantity}</TableCell>
                                   </TableRow>
                                 ))}
